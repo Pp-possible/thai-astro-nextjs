@@ -1,65 +1,125 @@
-import Image from "next/image";
+"use client";
+
+import React, { useEffect } from "react";
+import { useLiff } from "@/lib/LiffProvider";
+import TopAppBar from "./components/TopAppBar";
+import BalanceCard from "./components/BalanceCard";
+import ModeCard from "./components/ModeCard";
+import BottomNav from "./components/BottomNav";
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
 
 export default function Home() {
+  const { isReady, liffError } = useLiff();
+
+  useEffect(() => {
+    // Only run tour if LIFF is ready and tutorial is not done
+    if (isReady && !localStorage.getItem("tutorial_done")) {
+      const driverObj = driver({
+        showProgress: true,
+        nextBtnText: 'ต่อไป ➔',
+        prevBtnText: '← กลับ',
+        doneBtnText: 'ปิด ✕',
+        progressText: '{{current}} / {{total}}',
+        allowClose: true,
+        steps: [
+          { element: '#tour-profile', popover: { title: 'ข้อมูลของคุณ', description: 'แสดงชื่อโปรไฟล์และบทบาทของคุณในระบบ' } },
+          { element: '#tour-balance', popover: { title: 'ยอด Stars คงเหลือ', description: 'Stars ใช้สำหรับแลกบริการดูดวงต่างๆ คุณสามารถกดปุ่ม "+ เติม Stars" ได้ที่นี่' } },
+          { element: '#tour-card-overview', popover: { title: '1. ภาพรวมทุกด้าน', description: 'โหมดนี้ใช้สำหรับเช็กดวงชะตาภาพรวมแบบครอบคลุมทั้ง 12 ด้าน (งาน เงิน ความรัก ฯลฯ) เหมาะสำหรับการเช็กพื้นดวงประจำปีหรือช่วงเวลาที่สนใจ' } },
+          { element: '#tour-card-question', popover: { title: '2. ทำนายเฉพาะเรื่อง', description: 'โหมดนี้สำหรับคนที่มีคำถามในใจชัดเจน พิมพ์คำถามลงไปได้เลย แล้วระบบจะให้คำตอบแบบตรงจุดและเจาะจงเฉพาะเรื่องที่คุณถาม' } },
+          { element: '#tour-card-interactive', popover: { title: '3. ปรึกษาเชิงลึก', description: 'โหมดที่แม่นยำสูงสุด! AI จะทำตัวเป็นหมอดู สัมภาษณ์และสอบถามบริบทแวดล้อมของคุณเพิ่มเติมก่อน เพื่อให้ได้คำทำนายที่ตรงกับสถานการณ์จริงที่สุด' } },
+          { element: '#tour-card-7days', popover: { title: '4. วิเคราะห์ดวง 7 วัน', description: 'โหมดนี้เหมาะสำหรับเตรียมตัวล่วงหน้า ระบบจะวิเคราะห์ดวงทั้ง 7 ด้านแบบรายวัน เพื่อให้คุณรู้ว่า 7 วันข้างหน้าจะต้องรับมือกับเรื่องอะไรบ้าง' } },
+          { element: '#tour-nav', popover: { title: 'เมนูนำทาง', description: 'คุณสามารถสลับหน้าจอระหว่างหน้าหลักและหน้าเติม Stars ได้อย่างรวดเร็วผ่านแถบด้านล่างนี้' } }
+        ],
+        onDestroyStarted: () => {
+          if (!driverObj.hasNextStep() || confirm("ต้องการปิดคำแนะนำการใช้งานใช่หรือไม่?")) {
+            localStorage.setItem('tutorial_done', 'true');
+            driverObj.destroy();
+          }
+        }
+      });
+      setTimeout(() => { driverObj.drive(); }, 400);
+    }
+  }, [isReady]);
+
+  if (!isReady) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center min-h-screen">
+        <div className="text-[var(--gold)] text-4xl mb-4 animate-spin">🔮</div>
+        <div className="text-[var(--text-dim)] font-body">กำลังเชื่อมต่อ...</div>
+      </div>
+    );
+  }
+
+  if (liffError) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6 text-center text-red-400">
+        <p>Error initializing LINE LIFF: {liffError}</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="flex-1 overflow-y-auto pb-[100px]">
+      <TopAppBar id="tour-profile" />
+
+      <div className="p-[0_20px]">
+        <div className="text-center py-4 text-[16px] text-[var(--text-dim)] leading-relaxed italic">
+          "ดวงดาวไม่ได้กำหนดชะตาชีวิตของคุณ,<br />
+          แต่ช่วยส่องแสงนำทางให้คุณเดินอย่างมั่นใจ"
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <BalanceCard id="tour-balance" />
+
+        <div className="flex items-center gap-4 mb-4">
+          <div className="flex-1 h-[1px] bg-gradient-to-r from-transparent to-[var(--gold-dim)] opacity-80"></div>
+          <h3 className="text-[18px] font-semibold text-[var(--text)]" style={{ fontFamily: "var(--font-heading-playfair)" }}>
+            บริการของเรา
+          </h3>
+          <div className="flex-1 h-[1px] bg-gradient-to-l from-transparent to-[var(--gold-dim)] opacity-80"></div>
         </div>
-      </main>
+
+        <div id="tour-services" className="grid grid-cols-2 gap-3 py-2">
+          <ModeCard
+            id="tour-card-overview"
+            icon="🪐"
+            title="ภาพรวมทุกด้าน"
+            desc="เช็กจังหวะชีวิต 12 ด้าน (งาน เงิน ความรัก ฯลฯ) เหมาะสำหรับดูภาพรวมพื้นดวง"
+            link="/form/overview"
+            priceType="free"
+            priceAmount={0}
+          />
+          <ModeCard
+            id="tour-card-question"
+            icon="🔍"
+            title="ทำนายเฉพาะเรื่อง"
+            desc="ถามตรงจุด ตอบตรงประเด็น! พิมพ์คำถามเฉพาะเรื่องที่อยากรู้ให้ระบบทำนายทันที"
+            link="/form/question"
+            priceType="paid"
+            priceAmount={10}
+          />
+          <ModeCard
+            id="tour-card-interactive"
+            icon="💬"
+            title="ปรึกษาเชิงลึก"
+            desc="ดึงความแม่นยำขั้นสุด! AI จะสัมภาษณ์เพื่อเข้าใจบริบทของคุณก่อนเริ่มทำนาย"
+            link="/form/interactive"
+            priceType="hipeak"
+            priceAmount={25}
+          />
+          <ModeCard
+            id="tour-card-7days"
+            icon="📅"
+            title="วิเคราะห์ดวง 7 วัน"
+            desc="เจาะลึก 7 ด้านรายวัน ทำนายล่วงหน้า 7 วันเต็ม โดดเด่นทุกมิติทั้งภายในภายนอก"
+            link="/form/7days"
+            priceType="peak"
+            priceAmount={15}
+          />
+        </div>
+      </div>
+
+      <BottomNav id="tour-nav" />
     </div>
   );
 }
