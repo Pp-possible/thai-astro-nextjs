@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "npx @tailwindcss/cli -i app/globals.css -o app/compiled.css --watch & next dev",
+    "build": "npx @tailwindcss/cli -i app/globals.css -o app/compiled.css && next build",
     "start": "next start",
     "lint": "eslint"
   },
@@ -12,7 +12,7 @@
     "@line/liff": "^2.29.1",
     "driver.js": "^1.6.0",
     "flatpickr": "^4.6.13",
-    "next": "16.2.10",
+    "next": "^15.1.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",

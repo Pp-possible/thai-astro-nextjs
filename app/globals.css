@@ -1,5 +1,5 @@
 @import "tailwindcss";
-
+@source "./";
 
 :root {
   /* ชุดสีหลัก (Mystical Purple & Gold) */
@@ -21,8 +21,8 @@
   --free-color: #4DEB9C; --paid-color: #D4AF37; --peak-color: #FF9B54; --hipeak-color: #FF5A5A;
   
   /* ตัวแปรฟอนต์ */
-  --font-heading: 'Playfair Display', 'Charmonman', serif;
-  --font-body: 'Sarabun', 'Noto Sans Thai', sans-serif;
+  --font-heading: var(--font-heading-playfair), 'Charmonman', serif;
+  --font-body: var(--font-body-sarabun), 'Noto Sans Thai', sans-serif;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body { 
