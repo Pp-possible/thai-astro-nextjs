@@ -10,7 +10,7 @@ import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 
 export default function Home() {
-  const { isReady, liffError } = useLiff();
+  const { isReady, liffError, usageState } = useLiff();
 
   useEffect(() => {
     // Only run tour if LIFF is ready and tutorial is not done
