@@ -86,8 +86,8 @@ export default function Home() {
             title="ภาพรวมทุกด้าน"
             desc="เช็กจังหวะชีวิต 12 ด้าน (งาน เงิน ความรัก ฯลฯ) เหมาะสำหรับดูภาพรวมพื้นดวง"
             link="/form/overview"
-            priceType="free"
-            priceAmount={0}
+            priceType="paid"
+            priceAmount={15}
           />
           <ModeCard
             id="tour-card-question"
@@ -96,7 +96,7 @@ export default function Home() {
             desc="ถามตรงจุด ตอบตรงประเด็น! พิมพ์คำถามเฉพาะเรื่องที่อยากรู้ให้ระบบทำนายทันที"
             link="/form/question"
             priceType="paid"
-            priceAmount={10}
+            priceAmount={2}
           />
           <ModeCard
             id="tour-card-interactive"
@@ -104,8 +104,8 @@ export default function Home() {
             title="ปรึกษาเชิงลึก"
             desc="ดึงความแม่นยำขั้นสุด! AI จะสัมภาษณ์เพื่อเข้าใจบริบทของคุณก่อนเริ่มทำนาย"
             link="/form/interactive"
-            priceType="hipeak"
-            priceAmount={25}
+            priceType="paid"
+            priceAmount={4}
           />
           <ModeCard
             id="tour-card-7days"
@@ -113,8 +113,8 @@ export default function Home() {
             title="วิเคราะห์ดวง 7 วัน"
             desc="เจาะลึก 7 ด้านรายวัน ทำนายล่วงหน้า 7 วันเต็ม โดดเด่นทุกมิติทั้งภายในภายนอก"
             link="/form/7days"
-            priceType="peak"
-            priceAmount={15}
+            priceType="paid"
+            priceAmount={5}
           />
         </div>
       </div>

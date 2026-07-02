@@ -6,6 +6,16 @@ import { useLiff } from "@/lib/LiffProvider";
 import flatpickr from "flatpickr";
 import "flatpickr/dist/flatpickr.min.css";
 import Swal from "sweetalert2";
+import { N8N_API_URL } from "@/lib/config";
+
+// Matches `getPriceForMode` from index.html
+const getPriceForMode = (mode: string) => {
+  if (mode === 'overview') return 15;
+  if (mode === 'question') return 2;
+  if (mode === 'interactive') return 4;
+  if (mode === '7days') return 5;
+  return 15;
+};
 
 export default function FormPage({ params }: { params: Promise<{ mode: string }> }) {
   const { mode } = use(params);
@@ -15,7 +25,16 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
   const [dateStr, setDateStr] = useState("");
   const [timeStr, setTimeStr] = useState("");
   const [province, setProvince] = useState("");
+  
+  // Normal question state
   const [question, setQuestion] = useState("");
+
+  // Interactive state
+  const [interactiveStep, setInteractiveStep] = useState(1);
+  const [interactiveChat, setInteractiveChat] = useState<{user: string, ai: string}[]>([
+    {user: "", ai: ""}
+  ]);
+  const [isLoadingNextStep, setIsLoadingNextStep] = useState(false);
 
   useEffect(() => {
     flatpickr("#birthdate", {
@@ -25,12 +44,65 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
     });
   }, []);
 
+  const buildInteractiveContext = (upToStep: number) => {
+    let context = "";
+    for (let i = 0; i < upToStep; i++) {
+        const text = interactiveChat[i]?.user || "";
+        if (text) context += `ผู้ใช้: ${text}\n`;
+        
+        const reply = interactiveChat[i]?.ai || "";
+        if (reply && i < upToStep - 1) context += `AI: ${reply}\n`;
+    }
+    return context;
+  };
+
+  const handleInteractiveSubmit = async () => {
+    const currentInput = interactiveChat[interactiveStep - 1]?.user.trim();
+    if (!currentInput) {
+        Swal.fire("ข้อผิดพลาด", "กรุณาพิมพ์ข้อมูลก่อนส่ง", "warning");
+        return;
+    }
+    
+    if (interactiveStep === 5) {
+        Swal.fire("ข้อมูลครบถ้วน", "กดปุ่มเริ่มทำนายด้านล่างได้เลยครับ", "success");
+        return;
+    }
+
+    setIsLoadingNextStep(true);
+    try {
+        const context = buildInteractiveContext(interactiveStep);
+        const res = await fetch(N8N_API_URL + '/chat-followup', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({context: context})
+        });
+        const data = await res.json();
+        
+        if (data.success && data.reply) {
+            // Update the AI reply for the current step
+            const newChat = [...interactiveChat];
+            newChat[interactiveStep - 1].ai = data.reply;
+            // Add a new empty step
+            newChat.push({user: "", ai: ""});
+            
+            setInteractiveChat(newChat);
+            setInteractiveStep(prev => prev + 1);
+        } else {
+            Swal.fire("ข้อผิดพลาด", "ไม่สามารถวิเคราะห์ข้อมูลได้ ลองใหม่อีกครั้ง", "error");
+        }
+    } catch (e) {
+        Swal.fire("ข้อผิดพลาด", "เกิดข้อผิดพลาดในการเชื่อมต่อ", "error");
+    } finally {
+        setIsLoadingNextStep(false);
+    }
+  };
+
   const handleSubmit = () => {
     if (!dateStr || !province) {
       Swal.fire({
         icon: "warning",
         title: "ข้อมูลไม่ครบถ้วน",
-        text: "กรุณาระบุ วันเกิด และ จังหวัดที่เกิด",
+        text: "กรุณาระบุ วัน/เดือน/ปีเกิด และ จังหวัดที่เกิด",
         confirmButtonColor: "#D4AF37",
       });
       return;
@@ -46,29 +118,54 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
       return;
     }
 
-    // In Next.js, we might send this data to an API, but since the original system
-    // uses liff.sendMessages to trigger the LINE bot, we'll keep that behavior.
-    const textData = [
-      `cmd:predict:${mode}`,
-      `date:${dateStr}`,
-      `time:${timeStr || "-"}`,
-      `province:${province}`,
-    ];
-    if (mode === "question" || mode === "interactive") {
-      textData.push(`question:${question}`);
+    const price = getPriceForMode(mode);
+    if (!profile || (profile.goldBalance ?? 0) < price) {
+      Swal.fire({
+        icon: "warning",
+        title: "ยอด Stars ไม่เพียงพอ!",
+        text: `ต้องใช้ ${price} Stars กรุณาเติม Stars`,
+        confirmButtonText: "ไปหน้าเติม Stars",
+        confirmButtonColor: "#D4AF37",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          router.push("/topup");
+        }
+      });
+      return;
     }
 
+    const txnId = profile?.userId 
+        ? `TXN-${profile.userId.slice(-6)}-${Date.now().toString(36)}`
+        : `TXN-${Date.now().toString(36)}`;
+
+    const formattedTime = timeStr || "12:00"; // fallback if needed
+    let content = `${dateStr} ${formattedTime} ${province}`;
+
+    if (mode === 'question') {
+        content += ` | ${question.trim()}`;
+    } else if (mode === 'interactive') {
+        let q = buildInteractiveContext(5).replace(/\n/g, " ");
+        content += ` | ${q}`;
+    } else if (mode === '7days') {
+        content += ` | MODE_7DAYS`;
+    }
+
+    const msg = `วิเคราะห์ดวงชะตา: ${content} [Ref: ${txnId}] [PRICE:${price}]`;
+
     if (liff && liff.isLoggedIn()) {
+      Swal.fire({
+        title: "กำลังส่งข้อมูล...",
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
       liff
-        .sendMessages([{ type: "text", text: textData.join("|") }])
+        .sendMessages([{ type: "text", text: msg }])
         .then(() => {
-          if (mode === "interactive") {
-             // Let the bot reply in LINE, but if there's a chat interface, we might redirect there.
-             // Originally, interactive mode just sent a message.
-             liff.closeWindow();
-          } else {
-             liff.closeWindow();
-          }
+          Swal.close();
+          liff.closeWindow();
         })
         .catch((err) => {
           console.error("sendMessages error", err);
@@ -76,7 +173,7 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
         });
     } else {
       // Not logged in or testing on web
-      Swal.fire("จำลองการส่งข้อมูล", textData.join("|"), "info");
+      Swal.fire("Dev Mode: ส่งข้อมูล (จำลอง)", msg, "info");
     }
   };
 
@@ -114,10 +211,9 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
 
       <div className="form-section">
         <label className="form-label">เวลาเกิด (ไม่บังคับ)</label>
-        <p className="form-hint">หากไม่ทราบ ระบบจะคำนวณแบบค่ากลาง</p>
+        <p className="form-hint">เช่น 09:30 (หากไม่ทราบให้เว้นว่างไว้)</p>
         <input
-          type="text"
-          placeholder="เช่น 09.30"
+          type="time"
           value={timeStr}
           onChange={(e) => setTimeStr(e.target.value)}
         />
@@ -125,7 +221,7 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
 
       <div className="form-section">
         <label className="form-label">จังหวัดที่เกิด</label>
-        <p className="form-hint">เลือกจังหวัดที่คุณเกิด</p>
+        <p className="form-hint">พิมพ์จังหวัดที่คุณเกิด</p>
         <input
           type="text"
           placeholder="กรุงเทพมหานคร"
@@ -135,13 +231,14 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
       </div>
 
       {(mode === "question" || mode === "interactive") && (
-        <div className="form-section">
-          <label className="form-label">
+        <div className="form-section mt-8">
+          <label className="form-label text-[18px]">
             {mode === "question" ? "คำถามของคุณ" : "ปรึกษาเชิงลึกกับผู้ช่วย AI"}
           </label>
+          
           {mode === "question" ? (
             <>
-              <div className="question-hint-box">
+              <div className="question-hint-box text-[14px]">
                 <span className="font-heading font-semibold tracking-wider text-[16px] block mb-1">
                   💡 คำแนะนำการตั้งคำถาม:
                 </span>
@@ -154,33 +251,71 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
                 placeholder="พิมพ์คำถามของคุณที่นี่..."
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
+                rows={4}
+                className="w-full mt-2"
               ></textarea>
             </>
           ) : (
-            <>
-              <div className="question-hint-box" style={{ background: "rgba(147, 51, 234, 0.1)", borderColor: "rgba(147, 51, 234, 0.3)" }}>
+            <div className="interactive-container mt-4">
+              <div className="question-hint-box text-[14px]" style={{ background: "rgba(147, 51, 234, 0.1)", borderColor: "rgba(147, 51, 234, 0.3)" }}>
                 <strong>🤖 Step: โหมดสัมภาษณ์โดย AI</strong><br />
-                1. <b>เริ่มเรื่อง:</b> พิมพ์คำถามหรือความกังวลตั้งต้นของคุณ<br />
+                1. <b>เริ่มเรื่อง:</b> พิมพ์ความกังวลตั้งต้นของคุณ<br />
                 2. <b>AI สัมภาษณ์:</b> ระบบจะถามกลับเพื่อดึงตัวแปรที่จำเป็น<br />
-                3. <b>ยืนยันข้อมูล:</b> เมื่อข้อมูลครบถ้วน ให้กดไปขั้นตอนถัดไปเพื่อทำนายผล
+                3. <b>ยืนยันข้อมูล:</b> เมื่อข้อมูลครบ (สูงสุด 5 คำถาม) ให้กดเริ่มทำนาย
               </div>
-              <textarea
-                placeholder="พิมพ์เรื่องที่คุณอยากปรึกษาที่นี่..."
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-              ></textarea>
-            </>
+              
+              <div className="mt-6 flex flex-col gap-4">
+                {interactiveChat.map((chat, idx) => (
+                  <div key={idx} className="flex flex-col gap-2">
+                    <label className="text-[var(--text-color)] font-medium text-[15px]">
+                      คำถามที่ {idx + 1} {idx === 4 && "(คำถามสุดท้าย)"}
+                    </label>
+                    <textarea
+                      placeholder={idx === 0 ? "เรื่องที่คุณอยากให้เราช่วยดูวันนี้คืออะไรครับ?" : "ตอบคำถาม AI..."}
+                      value={chat.user}
+                      onChange={(e) => {
+                        const newChat = [...interactiveChat];
+                        newChat[idx].user = e.target.value;
+                        setInteractiveChat(newChat);
+                      }}
+                      disabled={interactiveStep > idx + 1}
+                      rows={3}
+                      className="w-full"
+                    />
+                    
+                    {idx === interactiveStep - 1 && idx < 4 && (
+                      <button 
+                        className="btn-secondary w-full py-2 mt-1" 
+                        onClick={handleInteractiveSubmit}
+                        disabled={isLoadingNextStep}
+                      >
+                        {isLoadingNextStep ? "⏳ กำลังวิเคราะห์..." : "ส่งคำตอบ & รับคำถามถัดไป"}
+                      </button>
+                    )}
+
+                    {chat.ai && (
+                      <div className="p-4 rounded-[12px] bg-[rgba(255,255,255,0.05)] border border-[var(--glass-border)] mt-2">
+                        <span className="text-[var(--gold)] font-semibold mb-1 block">🤖 AI ถามกลับ:</span>
+                        <p className="text-[14px] leading-relaxed">{chat.ai}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}
 
       <div className="bottom-bar">
-        <button onClick={handleSubmit} className="btn-primary">
+        <button 
+           onClick={handleSubmit} 
+           className="btn-primary"
+           disabled={mode === 'interactive' && (interactiveStep < 5 && interactiveChat[interactiveStep-1]?.user.length === 0)}
+        >
           ✨ {mode === "interactive" ? "ส่งข้อมูล & เริ่มทำนาย" : "เริ่มทำนาย"}
         </button>
       </div>
     </div>
   );
 }
-
-export const runtime = 'edge';

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import liff from "@line/liff";
+import { N8N_API_URL } from "./config";
 
 export interface LiffContextType {
   liff: typeof liff | null;
@@ -11,6 +12,8 @@ export interface LiffContextType {
     userId: string;
     displayName: string;
     pictureUrl?: string;
+    goldBalance?: number;
+    isNewUser?: boolean;
   } | null;
 }
 
@@ -43,12 +46,53 @@ export function LiffProvider({
         if (liff.isLoggedIn()) {
           liff
             .getProfile()
-            .then((p) => {
-              setProfile({
-                userId: p.userId,
-                displayName: p.displayName,
-                pictureUrl: p.pictureUrl,
-              });
+            .then(async (p) => {
+              try {
+                // Register user if not exists
+                await fetch(N8N_API_URL + '/register', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    action: 'register',
+                    userId: p.userId, 
+                    displayName: liff.getDecodedIDToken()?.name || p.displayName 
+                  })
+                });
+                
+                // Fetch user profile (includes goldBalance)
+                const res = await fetch(N8N_API_URL + '/profile', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'profile', userId: p.userId })
+                });
+                
+                if (res.ok) {
+                  const data = await res.json();
+                  setProfile({
+                    userId: p.userId,
+                    displayName: p.displayName,
+                    pictureUrl: p.pictureUrl,
+                    goldBalance: data.goldBalance || 0,
+                    isNewUser: data.isNewUser || false,
+                  });
+                } else {
+                  // Fallback if API fails
+                  setProfile({
+                    userId: p.userId,
+                    displayName: p.displayName,
+                    pictureUrl: p.pictureUrl,
+                    goldBalance: 0,
+                  });
+                }
+              } catch (apiErr) {
+                console.error("API Error:", apiErr);
+                setProfile({
+                  userId: p.userId,
+                  displayName: p.displayName,
+                  pictureUrl: p.pictureUrl,
+                  goldBalance: 0,
+                });
+              }
               setIsReady(true);
             })
             .catch((err) => {

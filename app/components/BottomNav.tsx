@@ -9,8 +9,7 @@ export default function BottomNav({ id }: { id?: string }) {
 
   const navItems = [
     { label: "หน้าหลัก", icon: "🏠", path: "/" },
-    { label: "ประวัติ", icon: "🕒", path: "/history" },
-    { label: "ตั้งค่า", icon: "⚙️", path: "/settings" },
+    { label: "เติม Stars", icon: "✨", path: "/topup" },
   ];
 
   return (
