@@ -2,7 +2,17 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import liff from "@line/liff";
-import { N8N_API_URL } from "./config";
+import { N8N_API_URL, N8N_USAGE_URL } from "./config";
+
+export interface UsageState {
+  isFree?: boolean;
+  freeRemaining?: number;
+  overviewPrice?: number;
+  questionPrice?: number;
+  interactivePrice?: number;
+  sevenDaysPrice?: number;
+  [key: string]: any;
+}
 
 export interface LiffContextType {
   liff: typeof liff | null;
@@ -15,6 +25,7 @@ export interface LiffContextType {
     goldBalance?: number;
     isNewUser?: boolean;
   } | null;
+  usageState: UsageState | null;
 }
 
 const LiffContext = createContext<LiffContextType>({
@@ -22,6 +33,7 @@ const LiffContext = createContext<LiffContextType>({
   liffError: null,
   isReady: false,
   profile: null,
+  usageState: null,
 });
 
 export const useLiff = () => useContext(LiffContext);
@@ -37,6 +49,7 @@ export function LiffProvider({
   const [liffError, setLiffError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [profile, setProfile] = useState<LiffContextType["profile"]>(null);
+  const [usageState, setUsageState] = useState<UsageState | null>(null);
 
   useEffect(() => {
     liff
@@ -48,42 +61,52 @@ export function LiffProvider({
             .getProfile()
             .then(async (p) => {
               try {
-                // Register user if not exists
-                await fetch(N8N_API_URL + '/register', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ 
-                    action: 'register',
-                    userId: p.userId, 
-                    displayName: liff.getDecodedIDToken()?.name || p.displayName 
+                // Run all fetches concurrently to speed up startup
+                const [registerRes, profileRes, usageRes] = await Promise.allSettled([
+                  // 1. Register
+                  fetch(N8N_API_URL + '/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                      action: 'register',
+                      userId: p.userId, 
+                      displayName: liff.getDecodedIDToken()?.name || p.displayName 
+                    })
+                  }),
+                  // 2. Profile
+                  fetch(N8N_API_URL + '/profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'profile', userId: p.userId })
+                  }),
+                  // 3. Usage
+                  fetch(N8N_USAGE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: p.userId, mode: 'check' })
                   })
-                });
-                
-                // Fetch user profile (includes goldBalance)
-                const res = await fetch(N8N_API_URL + '/profile', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ action: 'profile', userId: p.userId })
-                });
-                
-                if (res.ok) {
-                  const data = await res.json();
-                  setProfile({
-                    userId: p.userId,
-                    displayName: p.displayName,
-                    pictureUrl: p.pictureUrl,
-                    goldBalance: data.goldBalance || 0,
-                    isNewUser: data.isNewUser || false,
-                  });
-                } else {
-                  // Fallback if API fails
-                  setProfile({
-                    userId: p.userId,
-                    displayName: p.displayName,
-                    pictureUrl: p.pictureUrl,
-                    goldBalance: 0,
-                  });
+                ]);
+
+                // Handle Profile
+                let userProfile = { userId: p.userId, displayName: p.displayName, pictureUrl: p.pictureUrl, goldBalance: 0, isNewUser: false };
+                if (profileRes.status === 'fulfilled' && profileRes.value.ok) {
+                  const data = await profileRes.value.json();
+                  userProfile.goldBalance = data.goldBalance || 0;
+                  userProfile.isNewUser = data.isNewUser || false;
                 }
+                setProfile(userProfile);
+
+                // Handle Usage
+                let currentUsage: UsageState = {
+                  isFree: true, freeRemaining: 5,
+                  overviewPrice: 15, questionPrice: 2,
+                  interactivePrice: 4, sevenDaysPrice: 5
+                };
+                if (usageRes.status === 'fulfilled' && usageRes.value.ok) {
+                  const data = await usageRes.value.json();
+                  currentUsage = { ...currentUsage, ...data };
+                }
+                setUsageState(currentUsage);
               } catch (apiErr) {
                 console.error("API Error:", apiErr);
                 setProfile({
@@ -91,6 +114,11 @@ export function LiffProvider({
                   displayName: p.displayName,
                   pictureUrl: p.pictureUrl,
                   goldBalance: 0,
+                });
+                setUsageState({
+                  isFree: true, freeRemaining: 5,
+                  overviewPrice: 15, questionPrice: 2,
+                  interactivePrice: 4, sevenDaysPrice: 5
                 });
               }
               setIsReady(true);
@@ -111,7 +139,7 @@ export function LiffProvider({
 
   return (
     <LiffContext.Provider
-      value={{ liff: liffObject, liffError, isReady, profile }}
+      value={{ liff: liffObject, liffError, isReady, profile, usageState }}
     >
       {children}
     </LiffContext.Provider>

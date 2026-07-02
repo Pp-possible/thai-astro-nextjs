@@ -2,11 +2,13 @@
 
 import React from "react";
 import { useLiff } from "@/lib/LiffProvider";
+import { useRouter } from "next/navigation";
 
 export default function BalanceCard({ id }: { id?: string }) {
-  // In the real app, we fetch balance from API. For now, it's mocked or managed via context/props.
-  // We'll just display a static UI or a placeholder until the API is hooked up.
-  const balance = 0; // TODO: fetch from API
+  const { profile } = useLiff();
+  const router = useRouter();
+  
+  const balance = profile?.goldBalance || 0;
 
   return (
     <div
@@ -25,10 +27,10 @@ export default function BalanceCard({ id }: { id?: string }) {
         <span id="goldBalance">{balance}</span>
       </div>
       <button
-        onClick={() => alert("ระบบเติมเงินกำลังอยู่ระหว่างการพัฒนา")} // TODO: connect to payment
+        onClick={() => router.push("/topup")}
         className="btn-primary"
       >
-        + เติม Stars
+        + เติม STARS
       </button>
     </div>
   );
