@@ -319,3 +319,5 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
     </div>
   );
 }
+
+export const runtime = 'edge';
