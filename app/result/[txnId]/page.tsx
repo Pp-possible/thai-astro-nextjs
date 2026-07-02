@@ -103,3 +103,5 @@ export default function ResultPage({ params }: { params: Promise<{ txnId: string
     </div>
   );
 }
+
+export const runtime = 'edge';
