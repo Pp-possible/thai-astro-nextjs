@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import liff from "@line/liff";
-import { N8N_API_URL, N8N_USAGE_URL } from "./config";
+import { N8N_API_URL } from "./config";
 
 export interface UsageState {
   isFree?: boolean;
@@ -61,9 +61,8 @@ export function LiffProvider({
             .getProfile()
             .then(async (p) => {
               try {
-                // Run all fetches concurrently to speed up startup
-                const [registerRes, profileRes, usageRes] = await Promise.allSettled([
-                  // 1. Register
+                // Fetch only from Cloud Run Backend (N8N is no longer used)
+                const [registerRes, profileRes] = await Promise.allSettled([
                   fetch(N8N_API_URL + '/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -73,40 +72,38 @@ export function LiffProvider({
                       displayName: liff.getDecodedIDToken()?.name || p.displayName 
                     })
                   }),
-                  // 2. Profile
                   fetch(N8N_API_URL + '/profile', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'profile', userId: p.userId })
-                  }),
-                  // 3. Usage
-                  fetch(N8N_USAGE_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: p.userId, mode: 'check' })
                   })
                 ]);
 
-                // Handle Profile
-                let userProfile = { userId: p.userId, displayName: p.displayName, pictureUrl: p.pictureUrl, goldBalance: 0, isNewUser: false };
+                let userProfile = { 
+                  userId: p.userId, 
+                  displayName: p.displayName, 
+                  pictureUrl: p.pictureUrl, 
+                  goldBalance: 0, 
+                  isNewUser: false 
+                };
+
                 if (profileRes.status === 'fulfilled' && profileRes.value.ok) {
                   const data = await profileRes.value.json();
-                  userProfile.goldBalance = data.goldBalance || 0;
+                  userProfile.goldBalance = parseInt(data.goldBalance) || 0;
                   userProfile.isNewUser = data.isNewUser || false;
                 }
                 setProfile(userProfile);
 
-                // Handle Usage
-                let currentUsage: UsageState = {
-                  isFree: true, freeRemaining: 5,
-                  overviewPrice: 15, questionPrice: 2,
-                  interactivePrice: 4, sevenDaysPrice: 5
-                };
-                if (usageRes.status === 'fulfilled' && usageRes.value.ok) {
-                  const data = await usageRes.value.json();
-                  currentUsage = { ...currentUsage, ...data };
-                }
-                setUsageState(currentUsage);
+                // Set static usage state (since n8n is removed)
+                // New users get 'isFree' for overview
+                setUsageState({
+                  isFree: userProfile.isNewUser,
+                  freeRemaining: userProfile.isNewUser ? 5 : 0,
+                  overviewPrice: 15,
+                  questionPrice: 10,
+                  interactivePrice: 25,
+                  sevenDaysPrice: 15
+                });
               } catch (apiErr) {
                 console.error("API Error:", apiErr);
                 setProfile({
@@ -116,9 +113,9 @@ export function LiffProvider({
                   goldBalance: 0,
                 });
                 setUsageState({
-                  isFree: true, freeRemaining: 5,
-                  overviewPrice: 15, questionPrice: 2,
-                  interactivePrice: 4, sevenDaysPrice: 5
+                  isFree: false, freeRemaining: 0,
+                  overviewPrice: 15, questionPrice: 10,
+                  interactivePrice: 25, sevenDaysPrice: 15
                 });
               }
               setIsReady(true);

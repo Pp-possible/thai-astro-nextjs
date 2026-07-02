@@ -11,7 +11,7 @@ import flatpickr from "flatpickr";
 import "flatpickr/dist/flatpickr.min.css";
 import { Thai } from "flatpickr/dist/l10n/th.js";
 
-// Import lucide icons (make sure to npm install lucide-react if you haven't)
+// Import lucide icons
 import { 
   Send, User, MapPin, Calendar, Clock, 
   HelpCircle, MessageCircle, AlertCircle, ChevronLeft
@@ -43,7 +43,7 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
   const getPrice = () => {
     if (!usageState) return mode === 'overview' ? 15 : (mode === 'interactive' ? 25 : (mode === '7days' ? 15 : 10));
     if (mode === 'overview') return usageState.isFree ? 0 : (usageState.overviewPrice ?? 15);
-    if (mode === 'question') return usageState.isFree ? 0 : (usageState.questionPrice ?? 10);
+    if (mode === 'question') return usageState.questionPrice ?? 10;
     if (mode === 'interactive') return usageState.interactivePrice ?? 25;
     if (mode === '7days') return usageState.sevenDaysPrice ?? 15;
     return 0;
