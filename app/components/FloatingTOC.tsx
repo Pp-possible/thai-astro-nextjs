@@ -3,106 +3,60 @@
 import React, { useState, useEffect } from "react";
 
 interface FloatingTOCProps {
-  headers: { id: string; text: string }[];
+  items: { id: string; title: string }[];
 }
 
-export default function FloatingTOC({ headers }: FloatingTOCProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export default function FloatingTOC({ items }: FloatingTOCProps) {
+  const [open, setOpen] = useState(false);
 
+  // Close TOC when scrolling
   useEffect(() => {
-    // Scroll spy or click outside logic can be added here
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.toc-overlay') && !target.closest('.toc-fab')) {
-        setIsOpen(false);
-      }
+    const handleScroll = () => {
+      if (open) setOpen(false);
     };
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [open]);
 
-  const scrollToRef = (id: string) => {
+  const toggleTOC = () => setOpen(!open);
+
+  const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
+      setOpen(false);
     }
-    setIsOpen(false);
   };
+
+  if (!items || items.length === 0) return null;
 
   return (
     <>
-      <button
-        className="toc-fab z-50 animate-[tocBounce_2s_ease-in-out_1s]"
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          position: "fixed",
-          bottom: "80px",
-          left: "20px",
-          width: "50px",
-          height: "50px",
-          borderRadius: "50%",
-          background: "linear-gradient(135deg, var(--gold-light), var(--gold-dim))",
-          boxShadow: "0 4px 15px rgba(212,175,55,0.4)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: "24px",
-          color: "#fff",
-          border: "none",
-          cursor: "pointer",
-          zIndex: 1000
-        }}
+      <div 
+        onClick={() => setOpen(false)}
+        className={`fixed inset-0 bg-black/50 z-[98] transition-opacity duration-300 ${open ? 'opacity-100 visible' : 'opacity-0 invisible'}`}
+      />
+      
+      <div 
+        className={`fixed bottom-[80px] left-[20px] flex flex-col gap-[10px] z-[99] transition-all duration-300 max-h-[70vh] overflow-y-auto pr-[10px] ${open ? 'opacity-100 translate-y-0 visible' : 'opacity-0 translate-y-[20px] invisible'}`}
       >
-        ⭐
-      </button>
+        {items.map((item) => (
+          <div
+            key={item.id}
+            onClick={() => scrollToSection(item.id)}
+            className="bg-[rgba(42,27,84,0.9)] border border-[var(--gold-dim)] backdrop-blur-[10px] px-[15px] py-[10px] rounded-[25px] text-[14px] text-white whitespace-nowrap shadow-[0_4px_15px_rgba(0,0,0,0.5)] cursor-pointer transition-all hover:bg-[var(--gold-dim)] hover:text-black active:bg-[var(--gold-dim)] active:text-black"
+          >
+            {item.title}
+          </div>
+        ))}
+      </div>
 
-      {isOpen && (
-        <div 
-          className="toc-overlay z-40"
-          style={{
-            position: "fixed",
-            bottom: "140px",
-            left: "20px",
-            width: "250px",
-            // Removed solid background to achieve style 1 as requested: "ไม่ต้องมีกรอบสี่เหลี่ยมด้านหลังสารบัญมารองรับ"
-            // But we might still want a slight glass blur for readability.
-            background: "transparent", 
-            backdropFilter: "blur(2px)",
-            padding: "0",
-            display: "flex",
-            flexDirection: "column",
-            gap: "8px"
-          }}
-        >
-          {headers.map((h, i) => (
-            <div
-              key={i}
-              onClick={() => scrollToRef(h.id)}
-              style={{
-                background: "rgba(255,255,255,0.1)",
-                backdropFilter: "blur(8px)",
-                padding: "8px 16px",
-                borderRadius: "20px",
-                color: "var(--gold-light)",
-                fontSize: "14px",
-                fontWeight: 600,
-                cursor: "pointer",
-                border: "1px solid rgba(212,175,55,0.3)",
-                width: "fit-content"
-              }}
-            >
-              {h.text}
-            </div>
-          ))}
-        </div>
-      )}
-      <style jsx global>{`
-        @keyframes tocBounce {
-          0%, 40%, 80%, 100% { transform: translateY(0) scale(1); }
-          20% { transform: translateY(-15px) scale(1.05); }
-          60% { transform: translateY(-25px) scale(1.1); }
-        }
-      `}</style>
+      <div 
+        onClick={toggleTOC}
+        className="fixed bottom-[20px] left-[20px] w-[50px] h-[50px] rounded-full bg-gradient-to-br from-[var(--gold)] to-[var(--gold-dim)] text-[#1A1200] text-[24px] flex justify-center items-center shadow-[0_4px_15px_rgba(212,175,55,0.4)] cursor-pointer z-[100] transition-transform active:scale-90"
+      >
+        ☰
+      </div>
     </>
   );
 }

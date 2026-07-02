@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { getPrediction } from "@/lib/api";
 import FloatingTOC from "../../components/FloatingTOC";
+import FloatingBackBtn from "../../components/FloatingBackBtn";
 import TopAppBar from "../../components/TopAppBar";
 
 export default function ResultPage({ params }: { params: Promise<{ txnId: string }> }) {
@@ -85,11 +86,7 @@ export default function ResultPage({ params }: { params: Promise<{ txnId: string
     <div className="flex-1 overflow-y-auto pb-[100px]">
       <TopAppBar />
       <div className="p-[20px]">
-        <button onClick={() => router.push("/")} className="back-btn mb-6">
-          <span className="text-[26px]">←</span>
-          <span>กลับหน้าหลัก</span>
-        </button>
-
+        <FloatingBackBtn href="/" />
         <div className="result-card bg-[rgba(255,255,255,0.03)] border border-[var(--glass-border)] rounded-[20px] p-[24px] backdrop-blur-md">
           {/* We must reset headerCounter before every render of ReactMarkdown to align with extractHeaders */}
           {(() => { headerCounter = 0; return null; })()}
@@ -99,7 +96,7 @@ export default function ResultPage({ params }: { params: Promise<{ txnId: string
         </div>
       </div>
 
-      {headers.length > 0 && <FloatingTOC headers={headers} />}
+      {headers.length > 0 && <FloatingTOC items={headers.map(h => ({ id: h.id, title: h.text }))} />}
     </div>
   );
 }

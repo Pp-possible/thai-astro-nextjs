@@ -6,6 +6,7 @@ import TopAppBar from "./components/TopAppBar";
 import BalanceCard from "./components/BalanceCard";
 import ModeCard from "./components/ModeCard";
 import BottomNav from "./components/BottomNav";
+import AstroLoader from "./components/AstroLoader";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 
@@ -45,8 +46,8 @@ export default function Home() {
   if (!isReady) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-screen">
-        <div className="text-[var(--gold)] text-4xl mb-4 animate-spin">🔮</div>
-        <div className="text-[var(--text-dim)] font-body">กำลังเชื่อมต่อ...</div>
+        <AstroLoader />
+        <div className="text-[var(--text-dim)] font-body mt-4">กำลังเชื่อมต่อ...</div>
       </div>
     );
   }

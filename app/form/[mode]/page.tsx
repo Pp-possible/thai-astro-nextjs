@@ -17,6 +17,12 @@ import {
   HelpCircle, MessageCircle, AlertCircle, ChevronLeft
 } from "lucide-react";
 
+import LocationSelect from "@/app/components/LocationSelect";
+import SavedProfileSelector from "@/app/components/SavedProfileSelector";
+import ProfileSaveBox from "@/app/components/ProfileSaveBox";
+import AstroLoader from "@/app/components/AstroLoader";
+import FloatingBackBtn from "@/app/components/FloatingBackBtn";
+
 export default function FormPage({ params }: { params: Promise<{ mode: string }> }) {
   const router = useRouter();
   const { liff, isReady, profile, usageState } = useLiff();
@@ -27,10 +33,12 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
   }, [params]);
 
   const [formData, setFormData] = useState({
+    name: "",
     date: "",
     time: "",
     unknownTime: false,
-    province: "กรุงเทพมหานคร",
+    province: "",
+    district: "",
     question: "",
   });
 
@@ -70,6 +78,24 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
     }
   }, [mode]);
 
+  const handleSelectProfile = (p: any) => {
+    setFormData(prev => ({
+      ...prev,
+      name: p.name || "",
+      date: p.date || "",
+      time: p.time || "",
+      unknownTime: p.unknownTime || false,
+      province: p.province || "",
+      district: p.district || "",
+    }));
+    
+    // Update flatpickr visual state
+    const dateInput = document.getElementById("f-date") as HTMLInputElement;
+    if (dateInput && (dateInput as any)._flatpickr) {
+      (dateInput as any)._flatpickr.setDate(p.date || "");
+    }
+  };
+
   const generateTxnId = () => {
     return 'TXN-' + Math.random().toString(36).substr(2, 9).toUpperCase();
   };
@@ -101,7 +127,7 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
       if (data.isFinished || interactiveStep >= 5) {
         // Send final string to LINE
         if (liff && liff.isLoggedIn()) {
-          const finalString = `วิเคราะห์ดวงชะตา: ${formData.date} ${formData.unknownTime ? 'ไม่ทราบเวลา' : formData.time} ${formData.province} | ปรึกษาเชิงลึกเสร็จสิ้น [Ref: ${txnId}] [PRICE:${price}]`;
+          const finalString = `วิเคราะห์ดวงชะตา: ${formData.date} ${formData.unknownTime ? 'ไม่ทราบเวลา' : formData.time} ${formData.province} ${formData.district} | ปรึกษาเชิงลึกเสร็จสิ้น [Ref: ${txnId}] [PRICE:${price}]`;
           await liff.sendMessages([{ type: "text", text: finalString }]);
           liff.closeWindow();
         } else {
@@ -125,6 +151,10 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
     }
     if (!formData.unknownTime && !formData.time) {
       Swal.fire("แจ้งเตือน", "กรุณาระบุ เวลาเกิด หรือเลือก 'ไม่ทราบเวลาเกิด'", "warning");
+      return;
+    }
+    if (!formData.province || !formData.district) {
+      Swal.fire("แจ้งเตือน", "กรุณาระบุ จังหวัดและอำเภอเกิด ให้ครบถ้วน", "warning");
       return;
     }
     if (mode === 'question' && formData.question.trim().length < 10) {
@@ -154,7 +184,7 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
     setTxnId(newTxnId);
 
     const timeStr = formData.unknownTime ? 'ไม่ทราบเวลา' : formData.time;
-    let textToSend = `วิเคราะห์ดวงชะตา: ${formData.date} ${timeStr} ${formData.province}`;
+    let textToSend = `วิเคราะห์ดวงชะตา: ${formData.date} ${timeStr} ${formData.province} ${formData.district}`;
     
     if (mode === 'overview') {
       textToSend += ` | ภาพรวมทุกด้าน [Ref: ${newTxnId}] [PRICE:${price}]`;
@@ -187,15 +217,18 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
     }
   };
 
-  if (!isReady || !mode) return <div className="p-6 text-center text-white">กำลังโหลด...</div>;
+  if (!isReady || !mode) return (
+    <div className="flex-1 flex flex-col items-center justify-center min-h-screen">
+      <AstroLoader />
+      <div className="text-[var(--text-dim)] font-body mt-4">กำลังโหลด...</div>
+    </div>
+  );
 
   return (
-    <div className="flex-1 overflow-y-auto pb-[100px] p-[20px]">
-      <button onClick={() => router.back()} className="back-btn mb-6 flex items-center gap-1">
-        <ChevronLeft size={24} /> <span>กลับ</span>
-      </button>
+    <div className="flex-1 overflow-y-auto pb-[100px] p-[20px] relative">
+      <FloatingBackBtn href="/" />
 
-      <div className="header mb-8 text-center">
+      <div className="header mb-8 text-center pt-8">
         <h1 className="text-[26px] font-bold text-[var(--gold)] drop-shadow-md">
           {getModeTitle()}
         </h1>
@@ -207,6 +240,24 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
       <div className="form-section bg-[rgba(255,255,255,0.03)] p-6 rounded-[24px] border border-[var(--glass-border)] shadow-lg backdrop-blur-md relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-[radial-gradient(circle,rgba(212,175,55,0.1)_0%,transparent_70%)] blur-xl"></div>
         
+        <SavedProfileSelector onSelect={handleSelectProfile} />
+        
+        <hr className="border-[var(--glass-border)] my-6" />
+
+        <div className="form-group mb-5">
+          <label className="form-label flex items-center gap-2">
+            <User size={18} className="text-[var(--gold-dim)]" />
+            ชื่อ (เพื่อความสะดวกในการจดจำ)
+          </label>
+          <input 
+            type="text" 
+            className="form-control" 
+            placeholder="ตั้งชื่อดวงชะตานี้..." 
+            value={formData.name}
+            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+          />
+        </div>
+
         <div className="form-group mb-5">
           <label className="form-label flex items-center gap-2">
              <Calendar size={18} className="text-[var(--gold-dim)]" /> 
@@ -247,99 +298,15 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
           />
         </div>
 
-        <div className="form-group mb-5">
-          <label className="form-label flex items-center gap-2">
-             <MapPin size={18} className="text-[var(--gold-dim)]" /> 
-             จังหวัดที่เกิด
-          </label>
-          <select 
-            className="form-control appearance-none" 
-            value={formData.province}
-            onChange={(e) => setFormData(prev => ({ ...prev, province: e.target.value }))}
-          >
-             <option value="กรุงเทพมหานคร">กรุงเทพมหานคร</option>
-             <option value="กระบี่">กระบี่</option>
-             <option value="กาญจนบุรี">กาญจนบุรี</option>
-             <option value="กาฬสินธุ์">กาฬสินธุ์</option>
-             <option value="กำแพงเพชร">กำแพงเพชร</option>
-             <option value="ขอนแก่น">ขอนแก่น</option>
-             <option value="จันทบุรี">จันทบุรี</option>
-             <option value="ฉะเชิงเทรา">ฉะเชิงเทรา</option>
-             <option value="ชลบุรี">ชลบุรี</option>
-             <option value="ชัยนาท">ชัยนาท</option>
-             <option value="ชัยภูมิ">ชัยภูมิ</option>
-             <option value="ชุมพร">ชุมพร</option>
-             <option value="เชียงราย">เชียงราย</option>
-             <option value="เชียงใหม่">เชียงใหม่</option>
-             <option value="ตรัง">ตรัง</option>
-             <option value="ตราด">ตราด</option>
-             <option value="ตาก">ตาก</option>
-             <option value="นครนายก">นครนายก</option>
-             <option value="นครปฐม">นครปฐม</option>
-             <option value="นครพนม">นครพนม</option>
-             <option value="นครราชสีมา">นครราชสีมา</option>
-             <option value="นครศรีธรรมราช">นครศรีธรรมราช</option>
-             <option value="นครสวรรค์">นครสวรรค์</option>
-             <option value="นนทบุรี">นนทบุรี</option>
-             <option value="นราธิวาส">นราธิวาส</option>
-             <option value="น่าน">น่าน</option>
-             <option value="บึงกาฬ">บึงกาฬ</option>
-             <option value="บุรีรัมย์">บุรีรัมย์</option>
-             <option value="ปทุมธานี">ปทุมธานี</option>
-             <option value="ประจวบคีรีขันธ์">ประจวบคีรีขันธ์</option>
-             <option value="ปราจีนบุรี">ปราจีนบุรี</option>
-             <option value="ปัตตานี">ปัตตานี</option>
-             <option value="พระนครศรีอยุธยา">พระนครศรีอยุธยา</option>
-             <option value="พังงา">พังงา</option>
-             <option value="พัทลุง">พัทลุง</option>
-             <option value="พิจิตร">พิจิตร</option>
-             <option value="พิษณุโลก">พิษณุโลก</option>
-             <option value="เพชรบุรี">เพชรบุรี</option>
-             <option value="เพชรบูรณ์">เพชรบูรณ์</option>
-             <option value="แพร่">แพร่</option>
-             <option value="พะเยา">พะเยา</option>
-             <option value="ภูเก็ต">ภูเก็ต</option>
-             <option value="มหาสารคาม">มหาสารคาม</option>
-             <option value="มุกดาหาร">มุกดาหาร</option>
-             <option value="แม่ฮ่องสอน">แม่ฮ่องสอน</option>
-             <option value="ยะลา">ยะลา</option>
-             <option value="ยโสธร">ยโสธร</option>
-             <option value="ร้อยเอ็ด">ร้อยเอ็ด</option>
-             <option value="ระนอง">ระนอง</option>
-             <option value="ระยอง">ระยอง</option>
-             <option value="ราชบุรี">ราชบุรี</option>
-             <option value="ลพบุรี">ลพบุรี</option>
-             <option value="ลำปาง">ลำปาง</option>
-             <option value="ลำพูน">ลำพูน</option>
-             <option value="เลย">เลย</option>
-             <option value="ศรีสะเกษ">ศรีสะเกษ</option>
-             <option value="สกลนคร">สกลนคร</option>
-             <option value="สงขลา">สงขลา</option>
-             <option value="สตูล">สตูล</option>
-             <option value="สมุทรปราการ">สมุทรปราการ</option>
-             <option value="สมุทรสงคราม">สมุทรสงคราม</option>
-             <option value="สมุทรสาคร">สมุทรสาคร</option>
-             <option value="สระแก้ว">สระแก้ว</option>
-             <option value="สระบุรี">สระบุรี</option>
-             <option value="สิงห์บุรี">สิงห์บุรี</option>
-             <option value="สุโขทัย">สุโขทัย</option>
-             <option value="สุพรรณบุรี">สุพรรณบุรี</option>
-             <option value="สุราษฎร์ธานี">สุราษฎร์ธานี</option>
-             <option value="สุรินทร์">สุรินทร์</option>
-             <option value="หนองคาย">หนองคาย</option>
-             <option value="หนองบัวลำภู">หนองบัวลำภู</option>
-             <option value="อ่างทอง">อ่างทอง</option>
-             <option value="อำนาจเจริญ">อำนาจเจริญ</option>
-             <option value="อุดรธานี">อุดรธานี</option>
-             <option value="อุตรดิตถ์">อุตรดิตถ์</option>
-             <option value="อุทัยธานี">อุทัยธานี</option>
-             <option value="อุบลราชธานี">อุบลราชธานี</option>
-             <option value="ต่างประเทศ">ต่างประเทศ (ระบุไม่ได้)</option>
-          </select>
-        </div>
+        <LocationSelect 
+          provinceValue={formData.province}
+          districtValue={formData.district}
+          onProvinceChange={(p) => setFormData(prev => ({ ...prev, province: p }))}
+          onDistrictChange={(d) => setFormData(prev => ({ ...prev, district: d }))}
+        />
 
         {mode === 'question' && (
-          <div className="form-group mb-5">
+          <div className="form-group mb-5 mt-5">
             <label className="form-label flex items-center gap-2">
                <HelpCircle size={18} className="text-[var(--gold-dim)]" /> 
                คำถามของคุณ (ระบุให้ชัดเจน)
@@ -352,6 +319,17 @@ export default function FormPage({ params }: { params: Promise<{ mode: string }>
             ></textarea>
           </div>
         )}
+
+        <ProfileSaveBox 
+          currentData={{
+            name: formData.name,
+            date: formData.date,
+            time: formData.time,
+            unknownTime: formData.unknownTime,
+            province: formData.province,
+            district: formData.district,
+          }}
+        />
 
         {interactiveChat.length > 0 && mode === 'interactive' && (
           <div className="mt-6 border-t border-[var(--glass-border)] pt-6">
